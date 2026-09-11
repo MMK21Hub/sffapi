@@ -3,10 +3,12 @@ use std::{
     path::PathBuf,
 };
 
-use actix_web::{App, HttpServer, Responder, get, web};
+use actix_web::{App, HttpResponse, HttpServer, Responder, get, web};
 use argh::FromArgs;
 use serde::Serialize;
 use tracing::{Level, event};
+
+use crate::{database::get_mini_pc, structs::MiniPCStats};
 
 mod data;
 mod database;
@@ -26,12 +28,77 @@ struct Sffapi {
     bind: IpAddr,
 }
 
+#[derive(Serialize)]
+struct MiniPCResponse {
+    id: i64,
+    title: String,
+    cpu: Option<String>,
+    hostname: Option<String>,
+    deployed: bool,
+    stats: Option<MiniPCStats>,
+}
+
+#[derive(Serialize)]
+struct ApiError {
+    error: &'static str,
+    message: String,
+}
+
 #[get("/device/{id}")]
-async fn mini_pc_stats(id: web::Path<i64>, cache: web::Data<data::StatsCache>) -> impl Responder {
-    match data::get_stats(&cache, id.into_inner()).await {
-        Ok(stats) => web::Json(stats),
-        Err(_) => todo!(),
-    }
+async fn mini_pc(
+    id: web::Path<i64>,
+    pool: web::Data<database::Pool>,
+    cache: web::Data<data::StatsCache>,
+) -> impl Responder {
+    let id = id.into_inner();
+
+    let connection = match pool.get() {
+        Ok(connection) => connection,
+        Err(err) => {
+            event!(Level::ERROR, "failed to get database connection: {err:#}");
+            return HttpResponse::InternalServerError().json(ApiError {
+                error: "internal_error",
+                message: "internal server error".to_string(),
+            });
+        }
+    };
+
+    let physical = match get_mini_pc(&connection, id) {
+        Ok(Some(physical)) => physical,
+        Ok(None) => {
+            return HttpResponse::NotFound().json(ApiError {
+                error: "not_found",
+                message: format!("no mini PC with id {id}"),
+            });
+        }
+        Err(err) => {
+            event!(Level::ERROR, "failed to load mini pc {id}: {err:#}");
+            return HttpResponse::InternalServerError().json(ApiError {
+                error: "database_error",
+                message: "failed to read mini PC from the database".to_string(),
+            });
+        }
+    };
+
+    let stats = match data::get_stats(&cache, id).await {
+        Ok(stats) => Some(stats),
+        Err(err) => {
+            event!(
+                Level::WARN,
+                "failed to fetch stats for mini pc {id}: {err:#}"
+            );
+            None
+        }
+    };
+
+    HttpResponse::Ok().json(MiniPCResponse {
+        id: physical.id,
+        title: physical.title,
+        cpu: physical.cpu,
+        hostname: physical.hostname,
+        deployed: physical.deployed,
+        stats,
+    })
 }
 
 #[derive(Serialize)]
@@ -57,7 +124,7 @@ async fn run_main() -> anyhow::Result<()> {
             .app_data(web::Data::new(pool.clone()))
             .app_data(web::Data::new(data::StatsCache::default()))
             .service(health_check)
-            .service(mini_pc_stats)
+            .service(mini_pc)
     })
     .bind((args.bind, args.port))?
     .run()

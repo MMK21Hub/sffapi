@@ -20,7 +20,6 @@ pub struct StatsCache {
 
 /// Returns cached stats if they're younger than TTL, otherwise fetches fresh.
 pub async fn get_stats(cache: &StatsCache, id: i64) -> anyhow::Result<MiniPCStats> {
-    // Fast path: only hold the lock while checking + cloning, never across `.await`.
     {
         let entries = cache.entries.lock().unwrap();
         if let Some(entry) = entries.get(&id) {
@@ -28,7 +27,7 @@ pub async fn get_stats(cache: &StatsCache, id: i64) -> anyhow::Result<MiniPCStat
                 return Ok(entry.stats.clone());
             }
         }
-    } // guard dropped here, before the await -> future stays Send
+    }
 
     let stats = fetch_stats(id).await?;
 
