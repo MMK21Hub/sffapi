@@ -13,5 +13,6 @@ r2d2 = "0.8.10"
 r2d2_sqlite = "0.35.0"
 rusqlite = "0.40.2"
 serde = { version = "1.0.229", features = ["derive"] }
+serde_rusqlite = "0.43.0"
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["json"] }

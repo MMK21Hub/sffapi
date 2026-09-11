@@ -1,13 +1,14 @@
 use anyhow::Context;
 use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::Connection;
-use rusqlite::OptionalExtension;
+use serde::Deserialize;
+use serde_rusqlite::from_rows;
 use std::path::Path;
 use std::time::Duration;
 
 pub type Pool = r2d2::Pool<SqliteConnectionManager>;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct PhysicalMiniPC {
     pub id: i64,
     pub title: String,
@@ -49,18 +50,9 @@ pub fn get_db_pool(path: impl AsRef<Path>) -> anyhow::Result<Pool> {
 
 pub fn all_mini_pcs(db: &Connection) -> anyhow::Result<Vec<PhysicalMiniPC>> {
     let mut statement =
-        db.prepare("SELECT id, title, homebox_id, cpu, hostname, deployed FROM physical_mini_pc")?;
-    let mini_pcs = statement
-        .query_map([], |row| {
-            Ok(PhysicalMiniPC {
-                id: row.get(0)?,
-                title: row.get(1)?,
-                homebox_id: row.get(2)?,
-                hostname: row.get(3)?,
-                deployed: row.get(4)?,
-            })
-        })?
-        .collect::<Result<Vec<_>, _>>()?;
+        db.prepare("SELECT id, title, homebox_id, hostname, deployed FROM physical_mini_pc")?;
+    let mini_pcs = from_rows::<PhysicalMiniPC>(statement.query([])?)
+        .collect::<serde_rusqlite::Result<Vec<_>>>()?;
 
     Ok(mini_pcs)
 }
@@ -68,19 +60,12 @@ pub fn all_mini_pcs(db: &Connection) -> anyhow::Result<Vec<PhysicalMiniPC>> {
 pub fn get_mini_pc(db: &Connection, id: i64) -> anyhow::Result<Option<PhysicalMiniPC>> {
     // he made a statement
     let mut statement = db.prepare(
-        "SELECT id, title, homebox_id, cpu, hostname, deployed FROM physical_mini_pc WHERE id = ?",
+        "SELECT id, title, homebox_id, hostname, deployed FROM physical_mini_pc WHERE id = ?",
     )?;
-    let mini_pc = statement
-        .query_row([id], |row| {
-            Ok(PhysicalMiniPC {
-                id: row.get(0)?,
-                title: row.get(1)?,
-                homebox_id: row.get(2)?,
-                hostname: row.get(3)?,
-                deployed: row.get(4)?,
-            })
-        })
-        .optional()?;
+    let mut rows = from_rows::<PhysicalMiniPC>(statement.query([id])?);
 
-    Ok(mini_pc)
+    match rows.next() {
+        Some(mini_pc) => Ok(Some(mini_pc?)),
+        None => Ok(None),
+    }
 }
