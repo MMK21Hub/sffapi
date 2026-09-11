@@ -6,3 +6,6 @@ edition = "2024"
 
 [dependencies]
 actix-web = "4"
+serde = { version = "1.0.229", features = ["derive"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["json"] }
