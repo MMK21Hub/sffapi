@@ -1,5 +1,20 @@
-pub struct PhysicalMiniPC {
-    id: i64,
-    title: String,
-    homebox_id: Option<i64>,
+use crate::database::PhysicalMiniPC;
+use serde::Serialize;
+
+#[derive(Clone, Debug, Serialize)]
+pub struct Bytes(pub u64);
+
+#[derive(Clone, Debug)]
+pub struct MiniPC {
+    pub id: i64,
+    pub hostname: String,
+    pub physical: PhysicalMiniPC,
+    pub stats: Option<MiniPCStats>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct MiniPCStats {
+    pub cpu: String,
+    pub ram_total: Bytes,
+    pub ram_used: Bytes,
 }

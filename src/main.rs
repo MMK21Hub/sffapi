@@ -8,7 +8,9 @@ use argh::FromArgs;
 use serde::Serialize;
 use tracing::{Level, event};
 
+mod data;
 mod database;
+mod structs;
 
 #[derive(FromArgs)]
 /// Unified Mini PC API
@@ -22,6 +24,14 @@ struct Sffapi {
     /// address to bind to (default: 0.0.0.0)
     #[argh(option, default = "IpAddr::V4(Ipv4Addr::UNSPECIFIED)")]
     bind: IpAddr,
+}
+
+#[get("/device/{id}")]
+async fn mini_pc_stats(id: web::Path<i64>, cache: web::Data<data::StatsCache>) -> impl Responder {
+    match data::get_stats(&cache, id.into_inner()).await {
+        Ok(stats) => web::Json(stats),
+        Err(_) => todo!(),
+    }
 }
 
 #[derive(Serialize)]
@@ -45,7 +55,9 @@ async fn run_main() -> anyhow::Result<()> {
     HttpServer::new(move || {
         App::new()
             .app_data(web::Data::new(pool.clone()))
+            .app_data(web::Data::new(data::StatsCache::default()))
             .service(health_check)
+            .service(mini_pc_stats)
     })
     .bind((args.bind, args.port))?
     .run()
