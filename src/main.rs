@@ -12,6 +12,7 @@ use crate::{database::get_mini_pc, structs::MiniPCStats};
 
 mod data;
 mod database;
+mod netdata;
 mod structs;
 
 #[derive(FromArgs)]
@@ -32,7 +33,6 @@ struct Sffapi {
 struct MiniPCResponse {
     id: i64,
     title: String,
-    cpu: Option<String>,
     hostname: Option<String>,
     deployed: bool,
     stats: Option<MiniPCStats>,
@@ -80,7 +80,7 @@ async fn mini_pc(
         }
     };
 
-    let stats = match data::get_stats(&cache, id).await {
+    let stats = match data::get_stats(&cache, &pool, id).await {
         Ok(stats) => Some(stats),
         Err(err) => {
             event!(
@@ -94,7 +94,6 @@ async fn mini_pc(
     HttpResponse::Ok().json(MiniPCResponse {
         id: physical.id,
         title: physical.title,
-        cpu: physical.cpu,
         hostname: physical.hostname,
         deployed: physical.deployed,
         stats,

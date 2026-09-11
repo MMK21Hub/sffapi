@@ -6,3 +6,8 @@
 - Wants non-obvious code decisions justified (why this signature/wrapper), with the trade-offs and a simpler alternative spelled out. Confidence: 0.5
 - When asking how to implement something, prefers concrete illustrative example code (explicitly invites placeholder code) over abstract prose. Confidence: 0.55
 - Prefers explicit, readable error-handling code over dense nested matching — e.g. flattens nested `Result` layers (`Ok(Ok(..))` / `Ok(Err(..))`) into separate `match`es so each handles one layer. Confidence: 0.6
+- Prefers minimizing dependency footprint — picks the option that reuses the existing stack (e.g. `awc` with `--no-default-features` in an actix project) over pulling in a heavier alternative like `reqwest` with new TLS/hyper/tower dependencies. Confidence: 0.7
+- Prefers API/library specifics be confirmed from official documentation and by probing a live instance/endpoint, rather than guessed. Confidence: 0.55
+- Prefers the current, non-deprecated version of an API even when an older one is simpler or works fine — will direct a switch to the latest version (e.g. Netdata v3 over deprecated v1) and accept the extra implementation work it requires. Confidence: 0.7
+- Prefers looking database columns up by name rather than by positional index (e.g. rusqlite `row.get("id")` over `row.get(0)`), to avoid fragile off-by-one/column-reorder bugs in row mapping. Confidence: 0.5
+- Prefers code split into focused single-responsibility modules/files — e.g. extracts external-service client logic (HTTP calls, response structs, unit conversions, constants) out of a mixed file into its own `{service}.rs` module, leaving the original file as just caching/business logic. Confidence: 0.6

@@ -4,7 +4,13 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::structs::{Bytes, MiniPCStats};
+use anyhow::Context;
+
+use crate::{
+    database::{self, Pool},
+    netdata,
+    structs::MiniPCStats,
+};
 
 const TTL: Duration = Duration::from_secs(1);
 
@@ -13,13 +19,22 @@ struct Entry {
     stats: MiniPCStats,
 }
 
-#[derive(Default)]
 pub struct StatsCache {
     entries: Mutex<HashMap<i64, Entry>>,
+    client: netdata::Client,
 }
 
-/// Returns cached stats if they're younger than TTL, otherwise fetches fresh.
-pub async fn get_stats(cache: &StatsCache, id: i64) -> anyhow::Result<MiniPCStats> {
+impl Default for StatsCache {
+    fn default() -> Self {
+        Self {
+            entries: Mutex::new(HashMap::new()),
+            client: netdata::Client::default(),
+        }
+    }
+}
+
+/// Get (cached) stats for a mini PC.
+pub async fn get_stats(cache: &StatsCache, pool: &Pool, id: i64) -> anyhow::Result<MiniPCStats> {
     {
         let entries = cache.entries.lock().unwrap();
         if let Some(entry) = entries.get(&id) {
@@ -29,7 +44,7 @@ pub async fn get_stats(cache: &StatsCache, id: i64) -> anyhow::Result<MiniPCStat
         }
     }
 
-    let stats = fetch_stats(id).await?;
+    let stats = fetch_stats(&cache.client, pool, id).await?;
 
     let mut entries = cache.entries.lock().unwrap();
     entries.insert(
@@ -42,13 +57,16 @@ pub async fn get_stats(cache: &StatsCache, id: i64) -> anyhow::Result<MiniPCStat
     Ok(stats)
 }
 
-/// Placeholder for the real network call to the mini PC.
-async fn fetch_stats(id: i64) -> anyhow::Result<MiniPCStats> {
-    Ok({
-        MiniPCStats {
-            cpu: "Intel Core i3".to_string(),
-            ram_total: Bytes(16 * 1024 * 1024 * 1024),
-            ram_used: Bytes(8 * 1024 * 1024 * 1024),
-        }
-    })
+/// Look up the mini PC's hostname, then fetch live stats from its Netdata agent.
+async fn fetch_stats(
+    client: &netdata::Client,
+    pool: &Pool,
+    id: i64,
+) -> anyhow::Result<MiniPCStats> {
+    let connection = pool.get().context("failed to get database connection")?;
+    let hostname = database::get_mini_pc(&connection, id)?
+        .and_then(|mini_pc| mini_pc.hostname)
+        .with_context(|| format!("mini PC {id} has no hostname"))?;
+
+    client.fetch_stats(&hostname).await
 }

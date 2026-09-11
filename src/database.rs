@@ -12,7 +12,6 @@ pub struct PhysicalMiniPC {
     pub id: i64,
     pub title: String,
     pub homebox_id: Option<i64>,
-    pub cpu: Option<String>,
     pub hostname: Option<String>,
     pub deployed: bool,
 }
@@ -22,7 +21,6 @@ CREATE TABLE IF NOT EXISTS physical_mini_pc (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
     homebox_id INTEGER,
-    cpu TEXT,
     hostname TEXT,
     deployed BOOLEAN NOT NULL DEFAULT 0
 );
@@ -58,9 +56,8 @@ pub fn all_mini_pcs(db: &Connection) -> anyhow::Result<Vec<PhysicalMiniPC>> {
                 id: row.get(0)?,
                 title: row.get(1)?,
                 homebox_id: row.get(2)?,
-                cpu: row.get(3)?,
-                hostname: row.get(4)?,
-                deployed: row.get(5)?,
+                hostname: row.get(3)?,
+                deployed: row.get(4)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -79,9 +76,8 @@ pub fn get_mini_pc(db: &Connection, id: i64) -> anyhow::Result<Option<PhysicalMi
                 id: row.get(0)?,
                 title: row.get(1)?,
                 homebox_id: row.get(2)?,
-                cpu: row.get(3)?,
-                hostname: row.get(4)?,
-                deployed: row.get(5)?,
+                hostname: row.get(3)?,
+                deployed: row.get(4)?,
             })
         })
         .optional()?;
