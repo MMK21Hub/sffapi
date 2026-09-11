@@ -1,7 +1,9 @@
 use anyhow::Context;
+use r2d2_sqlite::SqliteConnectionManager;
 use std::path::Path;
+use std::time::Duration;
 
-use rusqlite::Connection;
+pub type Pool = r2d2::Pool<SqliteConnectionManager>;
 
 const SCHEMA: &str = r#"
 CREATE TABLE IF NOT EXISTS mini_pc (
@@ -11,7 +13,7 @@ CREATE TABLE IF NOT EXISTS mini_pc (
 );
 "#;
 
-pub fn get_db(path: impl AsRef<Path>) -> anyhow::Result<Connection> {
+pub fn get_db_pool(path: impl AsRef<Path>) -> anyhow::Result<Pool> {
     let path = path.as_ref();
     if let Some(parent) = path.parent() {
         if !parent.as_os_str().is_empty() {
@@ -21,12 +23,13 @@ pub fn get_db(path: impl AsRef<Path>) -> anyhow::Result<Connection> {
         }
     }
 
-    let conn = Connection::open(path)
-        .with_context(|| format!("Failed to open database {}", path.display()))?;
+    let manager = SqliteConnectionManager::file(path).with_init(|conn| {
+        conn.busy_timeout(Duration::from_secs(5))?;
+        conn.pragma_update(None, "foreign_keys", true)?;
+        conn.execute_batch(SCHEMA)
+    });
 
-    conn.busy_timeout(std::time::Duration::from_secs(5))?;
-    conn.pragma_update(None, "foreign_keys", true)?;
-    conn.execute_batch(SCHEMA)?;
-
-    Ok(conn)
+    r2d2::Pool::builder()
+        .build(manager)
+        .with_context(|| format!("Failed to open database {}", path.display()))
 }

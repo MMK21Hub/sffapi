@@ -8,6 +8,8 @@ edition = "2024"
 actix-web = "4"
 anyhow = "1.0.104"
 argh = "0.1.19"
+r2d2 = "0.8.10"
+r2d2_sqlite = "0.35.0"
 rusqlite = "0.40.2"
 serde = { version = "1.0.229", features = ["derive"] }
 tracing = "0.1.44"

@@ -36,19 +36,15 @@ async fn health_check() -> impl Responder {
     })
 }
 
-struct AppState {
-    db_connection: rusqlite::Connection,
-}
-
 async fn run_main() -> anyhow::Result<()> {
     let args: Sffapi = argh::from_env();
 
+    let pool = database::get_db_pool(&args.database)?;
+
     event!(Level::INFO, "starting server");
     HttpServer::new(move || {
-        // let db_connection = database::get_db(args.database.as_path())?;
-        // let state =
-
-        App::new() //
+        App::new()
+            .app_data(web::Data::new(pool.clone()))
             .service(health_check)
     })
     .bind((args.bind, args.port))?
