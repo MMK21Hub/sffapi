@@ -6,6 +6,9 @@ edition = "2024"
 
 [dependencies]
 actix-web = "4"
+anyhow = "1.0.104"
+argh = "0.1.19"
+rusqlite = "0.40.2"
 serde = { version = "1.0.229", features = ["derive"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["json"] }
