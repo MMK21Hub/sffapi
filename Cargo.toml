@@ -1,0 +1,8 @@
+[package]
+name = "sffapi"
+description = "Mish's unified Mini PC API"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+actix-web = "4"
