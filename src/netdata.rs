@@ -3,7 +3,7 @@ use std::{collections::HashMap, time::Duration};
 use anyhow::{Context, bail};
 use serde::Deserialize;
 
-use crate::structs::{Bytes, MiniPCStats};
+use crate::structs::{Bytes, MiniPCStats, OperatingSystem};
 
 /// Every mini PC runs a Netdata agent at this domain and port.
 const DOMAIN: &str = "ts.slevel.xyz";
@@ -12,6 +12,9 @@ const REQUEST_TIMEOUT: Duration = Duration::from_secs(1);
 
 /// Shown when Netdata does not report the CPU model.
 const CPU_PLACEHOLDER: &str = "Intel Core i3";
+
+/// Shown when Netdata does not report an operating system field.
+const OS_PLACEHOLDER: &str = "unknown";
 
 pub struct Client {
     client: awc::Client,
@@ -30,17 +33,23 @@ impl Client {
         let base = format!("http://{hostname}.{DOMAIN}:{PORT}");
 
         let info: InfoResponse = self.get_json(format!("{base}/api/v3/info")).await?;
-        let hw = &info
+        let application = &info
             .agents
             .first()
             .with_context(|| format!("Netdata info from {base} reported no agents"))?
-            .application
-            .hw;
-        let ram_total = hw
+            .application;
+        let ram_total = application
+            .hw
             .get("ram")
             .with_context(|| format!("Netdata info from {base} reported no ram_total"))?
             .parse::<u64>()
             .context("Netdata reported a non-numeric ram_total")?;
+        let operating_system = OperatingSystem {
+            kernel: os_field(&application.os, "kernel"),
+            kernel_version: os_field(&application.os, "kernel_version"),
+            os: os_field(&application.os, "os"),
+            os_version: os_field(&application.os, "version"),
+        };
 
         let nodes: NodesResponse = self.get_json(format!("{base}/api/v3/nodes")).await?;
         let cpu = nodes
@@ -73,6 +82,7 @@ impl Client {
 
         Ok(MiniPCStats {
             cpu,
+            operating_system,
             ram_total: Bytes(ram_total),
             ram_used: Bytes(to_bytes(*used, units)?),
         })
@@ -93,6 +103,12 @@ impl Client {
             .await
             .map_err(|err| anyhow::anyhow!("failed to parse Netdata response from {url}: {err}"))
     }
+}
+
+fn os_field(os: &HashMap<String, String>, key: &str) -> String {
+    os.get(key)
+        .cloned()
+        .unwrap_or_else(|| OS_PLACEHOLDER.to_string())
 }
 
 fn to_bytes(value: f64, units: &str) -> anyhow::Result<u64> {
@@ -119,6 +135,8 @@ struct InfoAgent {
 #[derive(Deserialize)]
 struct InfoApplication {
     hw: HashMap<String, String>,
+    #[serde(default)]
+    os: HashMap<String, String>,
 }
 
 #[derive(Deserialize)]

@@ -13,8 +13,17 @@ pub struct MiniPC {
 }
 
 #[derive(Clone, Debug, Serialize)]
+pub struct OperatingSystem {
+    pub kernel: String,
+    pub kernel_version: String,
+    pub os: String,
+    pub os_version: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
 pub struct MiniPCStats {
     pub cpu: String,
+    pub operating_system: OperatingSystem,
     pub ram_total: Bytes,
     pub ram_used: Bytes,
 }
